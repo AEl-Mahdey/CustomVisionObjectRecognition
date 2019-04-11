@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>customvision Playground</title>
+</head>
+<body>
+    <p>Upload your image:</p>
+    <input id="ImageURL"/> 
+    <button id="Test" onclick="analyzeButtonClick();"> Test</button>
+
+    <div>
+            <canvas id="canvas">
+                <img src="" id="ImageToTest" />
+            </canvas>
+    </div>
+
+    <div>
+        <p id="subtotal">Subtotal: </p>
+        <p id="fateBreakdown"> </p>
+        
+        <canvas id="mapCanvas">
+            <img id="Map" />
+        </canvas>
+    </div>
+    
+</body>
+</html>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"> </script>
+
+<script>
+    //Get your key from customvision.ai
+    var PredicitionKey = "5951887b29a74effbaa9c0b85604f43f"; 
+    var taggedAreas =[];
+    
+    function analyzeButtonClick() {
+        var imageURL = document.getElementById("ImageURL").value;
+        $("#ImageToTest").attr("src", imageURL);
+        $("#responseTextArea").val("");
+        var sourceImageUrl = $("#ImageToTest").attr('src');
+
+        AnalyzeImage(sourceImageUrl, $("#responseTextArea"));
+    }
+
+    function AnalyzeImage(sourceImageUrl, responseTextArea ) {
+        // Request parameters.
+        var params = {
+            "visualFeatures": "Categories,Description,Color",
+            "details": "",
+            "language": "en",
+        };
+
+        // Perform the REST API call.
+        $.ajax({
+
+            //Find your URL at customvision.ai
+            url:"https://southcentralus.api.cognitive.microsoft.com/customvision/v2.0/Prediction/233aea84-c249-46ed-9f6f-d2798f91f4a9/url",
+            
+
+            // Request headers.
+            beforeSend: function (jqXHR) {
+                jqXHR.setRequestHeader("Content-Type", "application/json");
+                jqXHR.setRequestHeader("Prediction-Key", PredicitionKey);
+            },
+
+
+            type: "POST",
+
+            // Request body.
+            data: '{"url": ' + '"' + sourceImageUrl + '"}',
+        })
+
+
+            .done(function (data) {
+
+                //Print the JSON in the response text area
+               responseTextArea.val(JSON.stringify(data, null, 2));
+
+
+                /* This method iterates over all of the data retrieved from calling the endpoint. 
+                * For every area you have tagged, it will loop through, extract the one with the highest probability and add it to 
+                * the taggedAreas array
+                */
+                console.log(data.predictions);
+               for(var i = 0; i < data.predictions.length; i ++){
+
+                   var latestObject = taggedAreas[taggedAreas.length -1  ];
+
+                   if(latestObject != null){
+
+                       if(data.predictions[i].tagName === latestObject.tagName && data.predictions[i].probability > latestObject.probability){
+                           taggedAreas.pop();
+                           taggedAreas.push(data.predictions[i]);
+                       } else if(data.predictions[i].tagName != latestObject.tagName ) {
+                            taggedAreas.push(data.predictions[i])
+                       } else {
+                           continue;
+                       }
+                   } else {
+                       taggedAreas.push(data.predictions[i]);
+                   }
+               }
+
+
+
+        var img = document.getElementById('ImageToTest');
+        var width = img.width;
+        var height = img.height;
+
+        var canvas = document.getElementById('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        var context = canvas.getContext("2d");
+        var imgObject = new Image();
+        var mapdata; 
+
+        imgObject.onload = function () {
+            imgObject.crossOrigin = "Anonymous";
+
+            DrawRectangles();
+        };
+
+
+        function DrawRectangles() {
+            context.clearRect(0, 0, canvas.width, canvas.height)
+            context.drawImage(imgObject, 0, 0, canvas.width, canvas.height);
+
+            for (var i = 0; i < taggedAreas.length; i++) {
+                context.beginPath();
+                context.rect(taggedAreas[i].boundingBox.left* width, taggedAreas[i].boundingBox.top * height, taggedAreas[i].boundingBox.width * width, taggedAreas[i].boundingBox.height * height);
+                context.lineWidth = "4";
+                context.strokeStyle = "red";
+                context.stroke();
+                context.closePath();
+            }
+
+        }
+        
+            imgObject.src = document.getElementById("ImageToTest").getAttribute("src");
+           // GetText();
+        })
+
+
+        .fail(function (jqXHR, textStatus, errorThrown) {
+            // Prepare the error string.
+            var errorString = (errorThrown === "") ? "Error. " : errorThrown + " (" + jqXHR.status + "): ";
+            errorString += (jqXHR.responseText === "") ? "" : (jQuery.parseJSON(jqXHR.responseText).message) ?
+                jQuery.parseJSON(jqXHR.responseText).message : jQuery.parseJSON(jqXHR.responseText).error.message;
+
+            // Put the error JSON in the response textarea.
+            responseTextArea.val(JSON.stringify(jqXHR, null, 2));
+
+            // Show the error message.
+            alert(errorString);
+        });
+
+        // function GetText(){
+
+
+        // }
+
+        // function DrawMap(){
+        //     var mapCanvas = $('#Map');
+        //     mapCanvas.width = 150;
+        //     mapCanvas.height = 150;
+        //     var context = mapCanvas.getContext("2d");
+        //     ctx1.rect(0, 0, 100, 100);
+        //     ctx1.fillStyle = 'white';
+        //     ctx1.fill();
+        //     ctx1.putImageData(mapdata, 0, 0);
+        //     var dstImg = $('#newImg').get(0);
+        //     dstImg.src = canvas1.toDataURL("image/png");
+    
+
+        // }
+    }
+
+</script>
